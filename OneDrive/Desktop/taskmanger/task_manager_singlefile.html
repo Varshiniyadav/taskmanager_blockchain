@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Task Manager — Single File</title>
+  <style>
+    :root{
+      --bg:#f7fff7;
+      --card:#ffffff;
+      --accent:#2a9d8f;
+      --muted:#6b7280;
+      --high:#ef4444; /* red */
+      --medium:#f59e0b; /* amber */
+      --low:#10b981; /* green */
+      --glass: rgba(255,255,255,0.65);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#ecfeff 0%, #f7fff7 60%);color:#0f172a}
+    .app{max-width:1000px;margin:28px auto;padding:20px}
+    header{display:flex;align-items:center;gap:18px}
+    .logo{width:76px;height:76px;border-radius:18px;background:linear-gradient(135deg,var(--accent),#264653);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:28px;box-shadow:0 8px 30px rgba(38,70,83,0.12)}
+    h1{margin:0;font-size:28px}
+    .sub{color:var(--muted);font-size:14px}
+
+    /* Page container */
+    .card{background:var(--card);border-radius:16px;padding:18px;margin-top:18px;box-shadow:0 8px 30px rgba(2,6,23,0.06)}
+    .controls{display:flex;gap:12px;align-items:center}
+    .btn{background:var(--accent);color:white;padding:12px 16px;border-radius:12px;border:0;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(42,157,143,0.18)}
+    .btn.ghost{background:transparent;color:var(--accent);border:2px solid rgba(42,157,143,0.12)}
+    .btn.small{padding:8px 10px;border-radius:10px;font-size:14px}
+
+    /* Views */
+    .view{display:none}
+    .view.active{display:block}
+
+    /* Home */
+    .quote-wrap{display:flex;align-items:center;gap:18px}
+    .quote{font-size:20px;font-weight:700;color:#073642;max-width:720px}
+    .quote small{display:block;font-size:12px;color:var(--muted);font-weight:500;margin-top:8px}
+    .teddy{font-size:84px;transform-origin:50% 70%;display:inline-block}
+    @keyframes boogie{0%{transform:rotate(-8deg) translateX(-2px)}50%{transform:rotate(8deg) translateX(2px)}100%{transform:rotate(-8deg) translateX(-2px)}}
+    .dance{animation:boogie 1s ease-in-out infinite}
+
+    /* Create form */
+    form{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start}
+    form .full{grid-column:1 / -1}
+    label{display:block;font-weight:600;margin-bottom:8px}
+    input[type=text], textarea, select, input[type=datetime-local]{width:100%;padding:12px;border-radius:10px;border:1px solid #e6eef0;font-size:15px}
+    textarea{min-height:120px;resize:vertical}
+
+    /* Task list */
+    .task-list{display:grid;gap:12px}
+    .task{display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:12px;border:1px solid rgba(2,6,23,0.04);background:linear-gradient(180deg,var(--glass),transparent)}
+    .priority-pill{padding:6px 10px;border-radius:999px;font-weight:700;font-size:13px}
+    .task .title{font-size:20px;font-weight:700;margin:0}
+    .task .meta{color:var(--muted);font-size:13px}
+    .task .controls{margin-left:auto;display:flex;gap:8px}
+    .btn.icon{padding:8px 10px;font-size:14px}
+
+    /* Priority colors */
+    .p-high{border-left:6px solid var(--high)}
+    .p-medium{border-left:6px solid var(--medium)}
+    .p-low{border-left:6px solid var(--low)}
+    .pill-high{background:rgba(239,68,68,0.12);color:var(--high)}
+    .pill-medium{background:rgba(245,158,11,0.1);color:var(--medium)}
+    .pill-low{background:rgba(16,185,129,0.08);color:var(--low)}
+
+    /* Block details */
+    .block-details{margin-top:10px;padding:12px;border-radius:10px;background:#fbfbff;border:1px dashed rgba(2,6,23,0.04);font-size:13px;color:#0f172a}
+    .small-muted{color:var(--muted);font-size:13px}
+
+    footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
+
+    /* Responsive */
+    @media (max-width:880px){
+      form{grid-template-columns:1fr;}
+      .logo{width:56px;height:56px;font-size:22px}
+      .teddy{font-size:64px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="logo">TM</div>
+      <div>
+        <h1>Task Manager — single HTML edition</h1>
+        <div class="sub">create • view • vibe — all in one file. saved locally in your browser.</div>
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="controls">
+        <button class="btn" id="nav-home">Home</button>
+        <button class="btn ghost" id="nav-create">Create Task</button>
+        <button class="btn ghost" id="nav-tasks">View Tasks</button>
+        <div style="flex:1"></div>
+        <button class="btn small" id="export">Export JSON</button>
+        <button class="btn small ghost" id="importBtn">Import JSON</button>
+        <input id="importFile" type="file" accept="application/json" style="display:none" />
+      </div>
+
+      <!-- HOME -->
+      <section id="home" class="view active">
+        <div style="display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:12px">
+          <div class="quote-wrap">
+            <div class="quote" id="quoteText">Motivation loading...</div>
+            <div style="margin-left:12px">
+              <div class="teddy dance" title="dance">🧸</div>
+            </div>
+          </div>
+          <div style="min-width:220px;display:flex;flex-direction:column;gap:10px;align-items:stretch">
+            <button class="btn" id="goCreate">Create Task</button>
+            <button class="btn ghost" id="goTasks">View Tasks</button>
+            <div class="small-muted" style="text-align:right">Tip: tasks are saved to your browser's localStorage.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CREATE -->
+      <section id="create" class="view">
+        <form id="taskForm" onsubmit="return false;">
+          <div>
+            <label for="title">Task title</label>
+            <input id="title" type="text" placeholder="eg. Study ML for 1 hour" required />
+
+            <label for="desc" style="margin-top:12px">Description</label>
+            <textarea id="desc" placeholder="Why this task matters..."></textarea>
+
+            <label for="deadline" style="margin-top:12px">Deadline (optional)</label>
+            <input id="deadline" type="datetime-local" />
+
+            <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+              <button class="btn" id="addTask">Add Task</button>
+              <button class="btn ghost" id="clearForm" type="button">Clear</button>
+            </div>
+          </div>
+
+          <div>
+            <label for="priority">Priority</label>
+            <select id="priority" style="margin-bottom:12px">
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low" selected>Low</option>
+            </select>
+
+            <label class="full" style="margin-top:8px">Quick notes / tags</label>
+            <input id="tags" type="text" placeholder="comma-separated tags (optional)" />
+
+            <div style="margin-top:18px;" class="small-muted">Blockchain details (optional):</div>
+            <label style="margin-top:8px">Tx hash (optional)</label>
+            <input id="txhash" type="text" placeholder="0x..." />
+            <label style="margin-top:8px">Block number (optional)</label>
+            <input id="blocknum" type="text" placeholder="e.g. 1482921" />
+          </div>
+        </form>
+      </section>
+
+      <!-- TASKS -->
+      <section id="tasks" class="view">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <h3 style="margin:0">Your tasks</h3>
+          <div class="small-muted">Sorted by priority — high → medium → low</div>
+        </div>
+        <div style="margin-top:12px" class="task-list" id="taskList"></div>
+        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn ghost" id="clearAll">Clear all tasks</button>
+          <button class="btn" id="addSample">Add sample tasks</button>
+        </div>
+      </section>
+
+    </div>
+
+    <footer>Made for you — single-file, offline-first. Save the HTML, open it, vibe responsibly.</footer>
+  </div>
+
+  <script>
+    // --- tiny utility helpers ---
+    const qs = s => document.querySelector(s);
+    const qsa = s => Array.from(document.querySelectorAll(s));
+
+    // --- quotes ---
+    const quotes = [
+      {t: "Progress, not perfection.", a: "— tiny steps"},
+      {t: "Ship it. Learn from the logs.", a: "— dev wisdom"},
+      {t: "Make the work small and your courage big.", a: "— vibe check"},
+      {t: "You don't need motivation. You need a plan.", a: "— planner"},
+      {t: "Atomic habits stack into mountains.", a: "— habit hacker"},
+      {t: "Work quietly, let results be noisy.", a: "— quiet flex"}
+    ];
+
+    function randomQuote(){
+      const pick = quotes[Math.floor(Math.random()*quotes.length)];
+      return `${pick.t} \n\u2014 ${pick.a}`;
+    }
+
+    // --- navigation ---
+    const views = {home:qs('#home'), create:qs('#create'), tasks:qs('#tasks')};
+    function show(view){
+      Object.values(views).forEach(v=>v.classList.remove('active'));
+      views[view].classList.add('active');
+    }
+
+    // --- storage ---
+    const STORAGE_KEY = 'taskmgr_v1';
+    function loadTasks(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw? JSON.parse(raw): [];
+      }catch(e){return []}
+    }
+    function saveTasks(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
+
+    // --- rendering tasks ---
+    function priorityOrder(p){ return p==='high'?0: p==='medium'?1:2 }
+
+    function renderTasks(){
+      const list = qs('#taskList'); list.innerHTML='';
+      const tasks = loadTasks().sort((a,b)=>priorityOrder(a.priority)-priorityOrder(b.priority) || new Date(a.created)-new Date(b.created));
+      if(tasks.length===0){ list.innerHTML = '<div class="small-muted" style="padding:18px">No tasks yet — add one!</div>'; return }
+      tasks.forEach((t, idx)=>{
+        const el = document.createElement('div');
+        el.className = `task p-${t.priority}`;
+        const pillClass = t.priority==='high'? 'pill-high': t.priority==='medium' ? 'pill-medium' : 'pill-low';
+        el.innerHTML = `
+          <div style="width:12px"></div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="display:flex;flex-direction:column">
+                <div class="title">${escapeHtml(t.title)}</div>
+                <div class="meta">${t.tags? escapeHtml(t.tags) + ' • ' : ''} ${t.deadline? (new Date(t.deadline)).toLocaleString() : 'no deadline'}</div>
+              </div>
+            </div>
+            <div style="margin-top:10px">${t.desc? '<div style="margin-bottom:8px">'+escapeHtml(t.desc)+'</div>':''}
+              <span class="priority-pill ${pillClass}">${t.priority.toUpperCase()}</span>
+            </div>
+            <div class="block-placeholder" style="margin-top:8px"></div>
+          </div>
+          <div class="controls">
+            <button class="btn icon" data-act="details" data-id="${t.id}">Block Details</button>
+            <button class="btn icon ghost" data-act="complete" data-id="${t.id}">Complete</button>
+            <button class="btn icon ghost" data-act="delete" data-id="${t.id}">Delete</button>
+          </div>
+        `;
+
+        // add priority left border
+        if(t.priority==='high') el.classList.add('p-high');
+        if(t.priority==='medium') el.classList.add('p-medium');
+        if(t.priority==='low') el.classList.add('p-low');
+
+        list.appendChild(el);
+
+        // details area injection
+        const detailsArea = el.querySelector('.block-placeholder');
+        // pre-prepare block details but hidden
+        const details = document.createElement('div');
+        details.className = 'block-details';
+        details.style.display='none';
+        details.innerHTML = `<div><strong>Tx hash:</strong> ${t.txhash? escapeHtml(t.txhash): '<span class="small-muted">none</span>'}</div>
+                              <div><strong>Block #:</strong> ${t.blocknum? escapeHtml(t.blocknum) : '<span class="small-muted">none</span>'}</div>
+                              <div style="margin-top:6px" class="small-muted">Created: ${new Date(t.created).toLocaleString()}</div>`;
+        detailsArea.appendChild(details);
+
+        // wire up actions
+        el.querySelectorAll('button[data-act]').forEach(b=>{
+          b.addEventListener('click', e=>{
+            const act = b.dataset.act; const id = b.dataset.id;
+            if(act==='details'){
+              details.style.display = details.style.display === 'none' ? 'block' : 'none';
+            }else if(act==='complete'){
+              handleComplete(id);
+            }else if(act==='delete'){
+              handleDelete(id);
+            }
+          })
+        })
+      })
+    }
+
+    // --- escape helper ---
+    function escapeHtml(s){ if(!s && s!==0) return ''; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;') }
+
+    // --- actions ---
+    function addTask(obj){ const tasks = loadTasks(); tasks.push(obj); saveTasks(tasks); renderTasks(); }
+    function handleComplete(id){ let tasks = loadTasks(); tasks = tasks.filter(t=>t.id!==id); saveTasks(tasks); renderTasks(); }
+    function handleDelete(id){ if(!confirm('Delete this task?')) return; let tasks = loadTasks(); tasks = tasks.filter(t=>t.id!==id); saveTasks(tasks); renderTasks(); }
+
+    // --- UI wiring ---
+    qs('#nav-home').addEventListener('click', ()=>show('home'));
+    qs('#nav-create').addEventListener('click', ()=>show('create'));
+    qs('#nav-tasks').addEventListener('click', ()=>{ show('tasks'); renderTasks(); });
+    qs('#goCreate').addEventListener('click', ()=>show('create'));
+    qs('#goTasks').addEventListener('click', ()=>{ show('tasks'); renderTasks(); });
+
+    qs('#addTask').addEventListener('click', ()=>{
+      const title = qs('#title').value.trim();
+      if(!title){ alert('Title is required'); return }
+      const obj = {
+        id: 't_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),
+        title: title,
+        desc: qs('#desc').value.trim(),
+        priority: qs('#priority').value,
+        tags: qs('#tags').value.trim(),
+        deadline: qs('#deadline').value || null,
+        txhash: qs('#txhash').value.trim() || null,
+        blocknum: qs('#blocknum').value.trim() || null,
+        created: new Date().toISOString()
+      };
+      addTask(obj);
+      // nice micro-feedback
+      qs('#title').value=''; qs('#desc').value=''; qs('#tags').value=''; qs('#txhash').value=''; qs('#blocknum').value=''; qs('#deadline').value='';
+      show('tasks');
+    });
+
+    qs('#clearForm').addEventListener('click', ()=>{ qs('#title').value=''; qs('#desc').value=''; qs('#tags').value=''; qs('#txhash').value=''; qs('#blocknum').value=''; qs('#deadline').value=''; });
+
+    qs('#clearAll').addEventListener('click', ()=>{ if(confirm('Clear ALL tasks? This cannot be undone.')){ localStorage.removeItem(STORAGE_KEY); renderTasks(); show('home'); } });
+    qs('#addSample').addEventListener('click', ()=>{
+      const samples = [
+        {title:'Study neural nets',desc:'Read 2 chapters and implement examples',priority:'high',tags:'study,aiml',txhash:null,blocknum:null},
+        {title:'Buy groceries',desc:'Milk, eggs, spinach',priority:'low',tags:'personal',txhash:null,blocknum:null},
+        {title:'Refactor tasks app',desc:'Make UI nicer and fix bugs',priority:'medium',tags:'dev',txhash:null,blocknum:null}
+      ];
+      const arr = loadTasks(); samples.forEach(s=>arr.push({...s,id:'t_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),created:new Date().toISOString()}));
+      saveTasks(arr); renderTasks(); show('tasks');
+    });
+
+    // export/import
+    qs('#export').addEventListener('click', ()=>{
+      const data = loadTasks(); const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='tasks_export.json'; a.click(); URL.revokeObjectURL(url);
+    });
+    qs('#importBtn').addEventListener('click', ()=> qs('#importFile').click());
+    qs('#importFile').addEventListener('change', e=>{
+      const f = e.target.files[0]; if(!f) return; const reader = new FileReader(); reader.onload = ev=>{
+        try{ const parsed = JSON.parse(ev.target.result); if(!Array.isArray(parsed)) throw new Error('Invalid'); saveTasks(parsed); renderTasks(); show('tasks'); alert('Imported.'); }catch(err){ alert('Invalid JSON file.'); }
+      }; reader.readAsText(f);
+    });
+
+    // helper: initial quote
+    qs('#quoteText').innerText = randomQuote();
+
+    // initial render
+    renderTasks();
+
+    // small UX: click nav updates active button styles
+    qsa('#nav-home,#nav-create,#nav-tasks').forEach(b=>b.addEventListener('click', function(){ qsa('#nav-home,#nav-create,#nav-tasks').forEach(x=>x.classList.remove('activeBtn')); this.classList.add('activeBtn'); }))
+
+    // extras: keyboard shortcut (n) for new task
+    document.addEventListener('keydown', e=>{ if(e.key.toLowerCase()==='n'){ show('create'); qs('#title').focus(); } })
+
+    // a tiny easter egg: long-press the teddy to toggle dance
+    const teddy = qs('.teddy'); let dancing=true; teddy.addEventListener('click', ()=>{ dancing = !dancing; teddy.classList.toggle('dance', dancing); });
+
+    // small polyfill for replaceAll if needed
+    if(!String.prototype.replaceAll){ String.prototype.replaceAll = function(search, replacement){ return this.split(search).join(replacement); } }
+  </script>
+</body>
+</html>
